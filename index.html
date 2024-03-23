@@ -51,6 +51,12 @@
           this.decksById[deck.id] = deck;
         }
       }
+      
+      addDeck(deck) {
+        this.decks.push(deck);
+        this.decksById[deck.id] = deck;
+        dirty();
+      }
 
       cryo() {
         return `new Database({decks:[${this.decks.map(deck => deck.cryo()).join(",")}]})`;
@@ -84,7 +90,7 @@
     function h(strings, ...args) {
       const template = document.createElement(`template`);
       template.innerHTML = args.reduce((prev, value, i) =>
-        prev + (value instanceof HTMLElement ? `<b append=${i}></b>` : value) + strings[i + 1],
+        prev + ((value instanceof HTMLElement || value instanceof DocumentFragment) ? `<b append=${i}></b>` : value) + strings[i + 1],
         strings[0]
       );
 
@@ -115,10 +121,86 @@
 
     function openScreen(screen) {
       if (currentScreen && currentScreen.deinit) currentScreen.deinit();
+
       currentScreen = screen;
-      screen.init();
+
+      let items = screen.init();
+
+      clear("#screen");
+      if (!Array.isArray(items)) items = [items];
+      for (let item of items) $("#screen").appendChild(item);
     }
 
+    class SelectDeckScreen {
+      constructor() { }
+
+      init() {
+        let left;
+        if (globalThis.database.decks.length > 0) {
+          left = h`<div>
+            <p>Pick a deck to study:</p>
+            <ul class="decklist" ref="list"></ul>
+          </div>`;
+
+          let { list } = left.collect();
+
+          for (let deck of globalThis.database.decks) {
+            let li = h`<li><a ref="a">${deck.id}</a></li>`;
+            let { a } = li.collect();
+            a.addEventListener("click", e => openScreen(new StudyScreen(deck)));
+            list.appendChild(li);
+          }
+        } else {
+          left = h`<div><p>No decks.</p></div>`
+        }
+
+        let hmm = h`<div class="select-deck">
+          ${left}
+          <div>
+            <p>This is miniflash. You have ${globalThis.database.decks.length} deck${globalThis.database.decks.length == 1 ? "" : "s"}.</p>
+            <button ref="addNew">Add a new deck</button>
+          </div>
+        </div>`;
+
+        let { addNew } = hmm.collect();
+        addNew.addEventListener("click", e => openScreen(new AddDeckScreen()));
+        return hmm;
+      }
+    }
+
+    class AddDeckScreen {
+      constructor() { }
+
+      init() {
+        let hmm = h`<div class="add-deck">
+          <div>Name of deck:</div>
+          <input ref="textbox" type="text" autofocus />
+          <button ref="add">Add deck</button>
+        </div>`
+
+        let { textbox, add } = hmm.collect();
+
+        //come up with a fresh default name for the deck
+        let newName = "";
+        let i = 1;
+        do {
+          newName = "Deck " + i;
+          i++;
+        } while (globalThis.database.decksById[newName]);
+        textbox.value = newName;
+
+        add.addEventListener("click", e => {
+          let deckName = textbox.value;
+          let deck = new CardDeck({id: deckName, cards: []});
+          globalThis.database.addDeck(deck);
+          
+          openScreen(new SelectDeckScreen());
+        });
+
+        return hmm;
+      }
+    }
+    
     class StudyScreen {
       deck;
 
@@ -135,6 +217,7 @@
       keypressListener;
 
       constructor(deck) {
+        console.log(deck);
         this.deck = deck;
 
         this.toStudy = [];
@@ -146,22 +229,14 @@
       }
 
       init() {
-        let elements = h`<div class="flexcol">
-          <div ref="card" id="card"></div>
+        let elements = h`<div id="study">
+          <div ref="card" id="flashcard"></div>
           <button ref="another" id="another"><u>a</u>nother</button>
         </div>`
-        
+
         let { card, another } = elements.collect();
         this.cardElement = card;
         this.anotherButton = another;
-        
-        card = document.createElement("div");
-        card.id = "card";
-        card.class = "dynamic-inside";
-
-        another = document.createElement("button");
-        another.id = "another";
-        another.innerHTML = "<u>a</u>nother";
 
         card.addEventListener("click", () => this.flip());
         another.addEventListener("click", (e) => {
@@ -185,16 +260,22 @@
           }
         });
 
-        clear("#screen");
-        $("#screen").appendChild(card);
-        $("#screen").appendChild(another);
-
         //initial card draw
         this.another();
+
+        return elements;
       }
 
       deinit() {
         document.removeEventListener("keypress", this.keypressListener);
+      }
+
+      another() {
+        if (this.toStudy.length == 0) this.reshuffle();
+
+        this.currentCard = this.toStudy[this.toStudy.length - 1];
+        this.display();
+        this.toStudy.pop();
       }
 
       reshuffle() {
@@ -208,7 +289,6 @@
 
       display() {
         let card = this.deck.cardsById[this.currentCard];
-
         this.cardElement.innerHTML = card[this.currentSide];
         this.cardElement.style.backgroundColor = (this.currentSide == "front" ? "white" : "#DEDEDE"); //todo use classes
       }
@@ -217,16 +297,16 @@
         this.currentSide = (this.currentSide == "front" ? "back" : "front");
         this.display();
       }
-
-      another() {
-        if (this.toStudy.length == 0) this.reshuffle();
-
-        this.currentCard = this.toStudy[this.toStudy.length - 1];
-        this.display();
-        this.toStudy.pop();
-      }
     }
 
+    function dirty() {
+      $("#save").style.outline = "2px solid red";
+    }
+    
+    function clean() {
+      $("#save").style.outline = "none";
+    }
+    
     function quine() {
       let copy = document.documentElement.cloneNode(true);
       copy.querySelectorAll(".dynamic, .dynamic-inside *").forEach(elem => elem.remove());
@@ -250,9 +330,11 @@
       copy.querySelector("#globals").innerHTML = globalsScript;
 
       let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
+      
+      clean();
 
       //download
-      if (true) {
+      if (true) { // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         console.log(stringified);
         return;
       }
@@ -270,27 +352,80 @@
     document.addEventListener("DOMContentLoaded", () => {
       $("#generation").innerHTML = globalThis.generation;
       $("#save").addEventListener("click", e => quine());
-      openScreen(new StudyScreen(database.decks[0]));
+      $("#title").addEventListener("click", e => openScreen(new SelectDeckScreen()));
+      openScreen(new SelectDeckScreen());
     });
 
   </script>
   <style>
+    :root {
+      --white: #fff;
+      --grey: #dedede;
+
+      --pad-small: 0.5rem;
+      --pad-med: 1rem;
+      --pad-lg: 2rem;
+    }
+
+    a {
+      cursor: pointer;
+    }
+
     html,
     body {
       margin: 0;
+      box-sizing: border-box;
+      
+      font-family: system-ui;
     }
 
     body {
-      padding-top: 3em;
-      gap: 3em;
-      background-color: lightgray;
-
       display: flex;
       flex-direction: column;
       align-items: center;
+      gap: var(--pad-med);
     }
 
-    #card {
+    nav {
+      width: 100%;
+
+      background-color: var(--grey);
+      padding: var(--pad-small) var(--pad-small);
+      box-sizing: border-box;
+
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+    }
+
+    .select-deck {
+      display: flex;
+      flex-direction: row;
+      gap: var(--pad-lg);
+    }
+
+    .select-deck>* {
+      padding: var(--pad-med);
+      border: 1px solid black;
+      border-radius: var(--pad-small);
+    }
+
+    .decklist {
+      font-size: 200%;
+    }
+
+    .decklist a {
+      color: red;
+    }
+
+    .add-deck {
+      display: flex;
+      flex-direction: column;
+      align-items: start;
+      gap: var(--pad-med);
+    }
+
+    #flashcard {
       width: 35rem;
       height: 20rem;
       background-color: white;
@@ -304,28 +439,17 @@
       justify-content: center;
       text-align: center;
     }
-
-    #another {
-      font-size: 3rem;
-    }
-
-    @media(max-width: 600px) {
-      #card {
-        width: 90vw;
-        font-size: 2rem;
-      }
-
-      #another u {
-        text-decoration: none;
-      }
-    }
   </style>
 </head>
 
 <body>
-  <h1>miniflash</h1>
-  <div id="screen"></div>
-  <button id="save">save (generation <span id="generation" class="dynamic-inside"></span>)</button>
+  <nav>
+    <h1><a id="title">miniflash</a></h1>
+    <button id="save">save (generation <span id="generation" class="dynamic-inside"></span>)</button>
+  </nav>
+  <main id="screen">
+
+  </main>
 </body>
 
 </html>
