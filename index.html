@@ -33,16 +33,15 @@
           this.cardsById[card.id] = card;
         }
       }
-      
+
       addCard(card) {
         this.cards.push(card);
         this.cardsById[card.id] = card;
         dirty();
       }
-      
+
       deleteCard(card) {
-        debugger;
-        this.cards.shift(this.cards.indexOf(card), 1);
+        this.cards.splice(this.cards.indexOf(card), 1);
         delete this.cardsById[card.id];
         dirty();
       }
@@ -56,31 +55,30 @@
       decks; decksById;
 
       constructor(props) {
-        Object.assign(this, props);
-        console.log(this);
+        this.decks = props.decks;
 
         this.decksById = {};
         for (let deck of this.decks) {
           this.decksById[deck.id] = deck;
         }
       }
-      
+
       addDeck(deck) {
         this.decks.push(deck);
         this.decksById[deck.id] = deck;
         dirty();
       }
-      
+
       changeId(deck, newId) {
-        delete decksById[deck.id];
+        delete this.decksById[deck.id];
         deck.id = newId;
         this.decksById[newId] = deck;
         dirty();
       }
-      
+
       deleteDeck(deck) {
         this.decks.splice(this.decks.indexOf(deck), 1);
-        this.decksById[deck.id] = undefined;
+        delete this.decksById[deck.id];
         dirty();
       }
 
@@ -159,7 +157,7 @@
 
     class SelectDeckScreen {
       database;
-      
+
       constructor(database) {
         this.database = database ? database : globalThis.database;
       }
@@ -175,9 +173,9 @@
           let { list } = left.collect();
 
           for (let deck of this.database.decks) {
-            let li = h`<li><a ref="a">${deck.id}</a></li>`;
-            let { a } = li.collect();
-            a.addEventListener("click", e => openScreen(new ManageDeckScreen(deck)));
+            let li = h`<li ref="clic">${deck.id}</li>`;
+            let { clic } = li.collect();
+            clic.addEventListener("click", e => openScreen(new ManageDeckScreen(deck)));
             list.appendChild(li);
           }
         } else {
@@ -221,23 +219,23 @@
 
         add.addEventListener("click", e => {
           let deckName = textbox.value;
-          let deck = new CardDeck({id: deckName, cards: []});
+          let deck = new CardDeck({ id: deckName, cards: [] });
           globalThis.database.addDeck(deck);
-          
+
           openScreen(new SelectDeckScreen());
         });
 
         return hmm;
       }
     }
-    
+
     class ManageDeckScreen {
       deck;
-      
+
       constructor(deck) {
         this.deck = deck;
       }
-      
+
       init() {
         let hmm = h`<div class="twocol">
           <div class="vflex">
@@ -251,51 +249,52 @@
             <button ref="renameButton">Rename deck</button>
             <button ref="deleteButton">Delete deck</button>
           </div>`;
-        
-        let {cardCount, addCard, cardList, studyButton, renameField, renameButton, deleteButton} = hmm.collect();
-        
+
+        let { cardCount, addCard, cardList, studyButton, renameField, renameButton, deleteButton } = hmm.collect();
+
         cardCount.innerText = `This deck has ${this.deck.cards.length} card${this.deck.cards.length == 1 ? "" : "s"}.`
         addCard.addEventListener("click", e => openScreen(new AddCardScreen(this.deck)));
         addCard.focus();
-        
-        for(let card of this.deck.cards) {
-          let cardHtml = h`<li><button ref="del">x</button> ${card.front} - ${card.back}</li>`
-          
+
+        for (let card of this.deck.cards) {
+          let cardHtml = h`<li><button ref="del">x</button> ${card.front} - ${card.back}</li>`;
+          let capture = card; //woh
+
           let { del } = cardHtml.collect();
           del.addEventListener("click", e => {
-            this.deck.deleteCard(card);
+            this.deck.deleteCard(capture);
             openScreen(new ManageDeckScreen(this.deck));
           })
-          
+
           cardList.appendChild(cardHtml);
         }
-        
+
         studyButton.addEventListener("click", e => openScreen(new StudyScreen(this.deck)));
-        
+
         renameField.value = this.deck.id;
-        renameField.addEventListener("keyup", e => { if(e.key == "Enter") renameButton.click(); });
+        renameField.addEventListener("keyup", e => { if (e.key == "Enter") renameButton.click(); });
         renameButton.addEventListener("click", e => {
           let newId = renameField.value;
           globalThis.database.changeId(this.deck, newId);
           openScreen(new SelectDeckScreen());
         })
-        
+
         deleteButton.addEventListener("click", e => {
           globalThis.database.deleteDeck(this.deck);
           openScreen(new SelectDeckScreen());
         })
-        
+
         return hmm;
       }
     }
-    
+
     class AddCardScreen {
       deck;
-      
+
       constructor(deck) {
         this.deck = deck;
       }
-      
+
       init() {
         let hmm = h`<div class="vflex">
           <label for="frontField">Front side</label>
@@ -304,26 +303,26 @@
           <input type="text" id="backField" ref="backField" />
           <button ref="addButton">Add card</button>
         </div>`
-        
-        let {frontField, backField, addButton} = hmm.collect();
-        
+
+        let { frontField, backField, addButton } = hmm.collect();
+
         let doIt = () => {
           let front = frontField.value;
           let back = backField.value;
           let id = Math.random();
-          
-          this.deck.addCard(new Flashcard({front, back, id}));
+
+          this.deck.addCard(new Flashcard({ front, back, id }));
           openScreen(new ManageDeckScreen(this.deck));
         }
-        
+
         addButton.addEventListener("click", e => doIt());
         frontField.focus();
-        backField.addEventListener("keyup", e => { if(e.key == "Enter") doIt(); });
-        
+        backField.addEventListener("keyup", e => { if (e.key == "Enter") doIt(); });
+
         return hmm;
       }
     }
-    
+
     class StudyScreen {
       deck;
 
@@ -340,7 +339,6 @@
       keypressListener;
 
       constructor(deck) {
-        console.log(deck);
         this.deck = deck;
 
         this.toStudy = [];
@@ -352,7 +350,7 @@
       }
 
       init() {
-        let elements = h`<div id="study">
+        let elements = h`<div class="vflex study">
           <div ref="card" id="flashcard"></div>
           <button ref="another" id="another"><u>a</u>nother</button>
         </div>`
@@ -396,23 +394,33 @@
       another() {
         if (this.toStudy.length == 0) this.reshuffle();
 
-        this.currentCard = this.toStudy[this.toStudy.length - 1];
+        if (this.toStudy.length > 0) {
+          this.currentCard = this.toStudy[this.toStudy.length - 1];
+          this.toStudy.pop();
+        }
+        
         this.display();
-        this.toStudy.pop();
       }
 
       reshuffle() {
+        if (this.deck.cardsById.length < 0) return;
+
         this.toStudy = Object.keys(this.deck.cardsById);
         for (let i = this.toStudy.length - 1; i > 0; i--) {
           let j = Math.floor(Math.random() * (i + 1));
           [this.toStudy[i], this.toStudy[j]] = [this.toStudy[j], this.toStudy[i]];
         }
-        console.log("shuffled! ", this.toStudy);
       }
 
       display() {
-        let card = this.deck.cardsById[this.currentCard];
-        this.cardElement.innerHTML = card[this.currentSide];
+        if (this.currentCard) {
+          let card = this.deck.cardsById[this.currentCard];
+          this.cardElement.innerHTML = card[this.currentSide];
+        } else {
+          this.cardElement.innerText = "No cards";
+          this.cardElement.style.opacity = 0.5;
+        }
+        
         this.cardElement.style.backgroundColor = (this.currentSide == "front" ? "white" : "#DEDEDE"); //todo use classes
       }
 
@@ -425,14 +433,14 @@
     function dirty() {
       $("#save").style.outline = "2px solid red";
     }
-    
+
     function clean() {
       $("#save").style.outline = "none";
     }
-    
+
     function quine(e) {
       clean();
-      
+
       let copy = document.documentElement.cloneNode(true);
       copy.querySelectorAll(".dynamic, .dynamic-inside *").forEach(elem => elem.remove());
       copy.querySelectorAll(".dynamic-inside").forEach(elem => {
@@ -445,7 +453,6 @@
       let globalsScript = `\n"use strict";\n`;
       for (let globalName of globalsToSave) {
         let global = globalThis[globalName];
-        console.log(globalName, global);
         let cryo = global.cryo ? global.cryo() : JSON.stringify(global);
 
         globalsScript += `globalThis.${globalName} = ${cryo};\n`;
@@ -455,7 +462,7 @@
       copy.querySelector("#globals").innerHTML = globalsScript;
 
       let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
-      
+
       //download
       if (e && e.shiftKey) { // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         console.log(stringified);
@@ -498,7 +505,7 @@
     body {
       margin: 0;
       box-sizing: border-box;
-      
+
       font-family: system-ui;
     }
 
@@ -533,6 +540,22 @@
       border-radius: var(--pad-small);
     }
 
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: var(--pad-med);
+    }
+
+    ul>li {
+      background-color: var(--grey);
+      border-radius: var(--pad-small);
+      padding: var(--pad-small);
+    }
+
     .decklist {
       font-size: 200%;
     }
@@ -540,13 +563,7 @@
     .decklist a {
       color: red;
     }
-    
-    .manage-deck {
-      display: flex;
-      flex-direction: row;
-      gap: var(--pad-lg);
-    }
-    
+
     .hflex {
       display: flex;
       flex-direction: row;
@@ -558,6 +575,10 @@
       flex-direction: column;
       align-items: start;
       gap: var(--pad-med);
+    }
+
+    .study {
+      align-items: center;
     }
 
     #flashcard {
@@ -573,6 +594,22 @@
       align-items: center;
       justify-content: center;
       text-align: center;
+    }
+
+    #another {
+      font-size: 300%;
+    }
+
+    @media screen and (max-width: 40rem) {
+      .twocol {
+        flex-direction: column;
+      }
+
+      #flashcard {
+        width: 90vw;
+        height: 15rem;
+        font-size: 2rem;
+      }
     }
   </style>
 </head>
