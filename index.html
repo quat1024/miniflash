@@ -72,45 +72,159 @@
       else return result; //else return all the elements
     }
 
-    let toStudy = [];
-    
-    let currentDeck = undefined;
-    let currentCard = undefined;
-    let currentSide = "front";
-
-    //show contents of a card in the html element
-    function display() {
-      let card = globalThis.database.decksById[currentDeck].cardsById[currentCard];
-      
-      $("#card").innerHTML = card[currentSide];
-      $("#card").style.backgroundColor = (currentSide == "front" ? "white" : "#DEDEDE"); //todo use classes
+    function clear(sel) {
+      document.querySelectorAll(sel).forEach(elem => {
+        while (elem.firstChild) elem.firstChild.remove();
+      });
     }
 
-    //flop current card to the other side
-    function flip() {
-      currentSide = (currentSide == "front" ? "back" : "front");
-      display();
+    //from "facon" by terkelg (some contributions by me)
+    // https://github.com/terkelg/facon/
+    // MIT license
+    function h(strings, ...args) {
+      const template = document.createElement(`template`);
+      template.innerHTML = args.reduce((prev, value, i) =>
+        prev + (value instanceof HTMLElement ? `<b append=${i}></b>` : value) + strings[i + 1],
+        strings[0]
+      );
+
+      const content = template.content;
+      content.querySelectorAll(`[append]`).forEach(refNode => {
+        refNode.parentNode.insertBefore(args[refNode.getAttribute('append')], refNode);
+        refNode.parentNode.removeChild(refNode);
+      });
+
+      content.collect = ({ attr = 'ref', keepAttribute, to = {} } = {}) => {
+        const refElements = content.querySelectorAll(`[${attr}]`);
+        return [...refElements].reduce((acc, element) => {
+          const propName = element.getAttribute(attr).trim();
+          !keepAttribute && element.removeAttribute(attr);
+          acc[propName] = acc[propName]
+            ? Array.isArray(acc[propName])
+              ? [...acc[propName], element]
+              : [acc[propName], element]
+            : element;
+          return acc;
+        }, to);
+      };
+
+      return content;
     }
 
-    //repopulate and shuffle the pile of cards to study
-    function reshuffle() {
-      let deck = globalThis.database.decksById[currentDeck];
-      
-      toStudy = Object.keys(deck.cardsById);
-      for (let i = toStudy.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1));
-        [toStudy[i], toStudy[j]] = [toStudy[j], toStudy[i]];
+    let currentScreen = undefined;
+
+    function openScreen(screen) {
+      if (currentScreen && currentScreen.deinit) currentScreen.deinit();
+      currentScreen = screen;
+      screen.init();
+    }
+
+    class StudyScreen {
+      deck;
+
+      toStudy;
+      correct;
+      incorrect;
+
+      currentCard;
+      currentSide;
+
+      //html elements and other errata
+      cardElement;
+      anotherButton;
+      keypressListener;
+
+      constructor(deck) {
+        this.deck = deck;
+
+        this.toStudy = [];
+        this.correct = [];
+        this.incorrect = [];
+
+        this.currentCard = undefined;
+        this.currentSide = "front";
       }
-      console.log("shuffled! ", toStudy);
-    }
 
-    //draw a card from the deck
-    function another() {
-      if (toStudy.length == 0) reshuffle();
+      init() {
+        let elements = h`<div class="flexcol">
+          <div ref="card" id="card"></div>
+          <button ref="another" id="another"><u>a</u>nother</button>
+        </div>`
+        
+        let { card, another } = elements.collect();
+        this.cardElement = card;
+        this.anotherButton = another;
+        
+        card = document.createElement("div");
+        card.id = "card";
+        card.class = "dynamic-inside";
 
-      currentCard = toStudy[toStudy.length - 1];
-      display();
-      toStudy.pop();
+        another = document.createElement("button");
+        another.id = "another";
+        another.innerHTML = "<u>a</u>nother";
+
+        card.addEventListener("click", () => this.flip());
+        another.addEventListener("click", (e) => {
+          this.another();
+          e.target.blur(); //so pressing space doesnt press the button again
+        });
+
+        //disable double-click-to-select on the card
+        card.addEventListener("mousedown", e => {
+          if (e.detail > 1) e.preventDefault();
+        });
+
+        //hotkeys
+        document.addEventListener("keypress", this.keypressListener = e => {
+          if (e.key == "a") {
+            this.another();
+            e.preventDefault();
+          } else if (e.key == " ") {
+            this.flip();
+            e.preventDefault();
+          }
+        });
+
+        clear("#screen");
+        $("#screen").appendChild(card);
+        $("#screen").appendChild(another);
+
+        //initial card draw
+        this.another();
+      }
+
+      deinit() {
+        document.removeEventListener("keypress", this.keypressListener);
+      }
+
+      reshuffle() {
+        this.toStudy = Object.keys(this.deck.cardsById);
+        for (let i = this.toStudy.length - 1; i > 0; i--) {
+          let j = Math.floor(Math.random() * (i + 1));
+          [this.toStudy[i], this.toStudy[j]] = [this.toStudy[j], this.toStudy[i]];
+        }
+        console.log("shuffled! ", this.toStudy);
+      }
+
+      display() {
+        let card = this.deck.cardsById[this.currentCard];
+
+        this.cardElement.innerHTML = card[this.currentSide];
+        this.cardElement.style.backgroundColor = (this.currentSide == "front" ? "white" : "#DEDEDE"); //todo use classes
+      }
+
+      flip() {
+        this.currentSide = (this.currentSide == "front" ? "back" : "front");
+        this.display();
+      }
+
+      another() {
+        if (this.toStudy.length == 0) this.reshuffle();
+
+        this.currentCard = this.toStudy[this.toStudy.length - 1];
+        this.display();
+        this.toStudy.pop();
+      }
     }
 
     function quine() {
@@ -128,7 +242,7 @@
         let global = globalThis[globalName];
         console.log(globalName, global);
         let cryo = global.cryo ? global.cryo() : JSON.stringify(global);
-        
+
         globalsScript += globalName + " = " + cryo + ";\n";
       }
 
@@ -138,11 +252,11 @@
       let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
 
       //download
-      if(true) {
+      if (true) {
         console.log(stringified);
         return;
       }
-      
+
       let blob = new Blob([stringified], { type: "text/html" });
       let url = URL.createObjectURL(blob);
       let a = document.createElement("a");
@@ -155,31 +269,8 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       $("#generation").innerHTML = globalThis.generation;
-      
-      //initialize the current deck and such
-      currentDeck = globalThis.database.decks[0].id;
-      
-      
-      $("#card").addEventListener("click", () => flip());
-      $("#another").addEventListener("click", (e) => {
-        another();
-        e.target.blur(); //so pressing space doesnt press the button again
-      });
-      $("#save").addEventListener("click", () => quine());
-
-      //disable double-click-to-select on the card
-      $("#card").addEventListener("mousedown", e => {
-        if (e.detail > 1) e.preventDefault();
-      });
-
-      //hotkeys
-      document.addEventListener("keypress", e => {
-        if (e.key == "a") another();
-        else if (e.key == " ") flip();
-      });
-
-      //initial shuffle
-      another();
+      $("#save").addEventListener("click", e => quine());
+      openScreen(new StudyScreen(database.decks[0]));
     });
 
   </script>
@@ -233,9 +324,8 @@
 
 <body>
   <h1>miniflash</h1>
-  <div id="card" class="dynamic-inside"></div>
-  <button id="another"><u>a</u>nother</button>
-  <button id="save">save (generation <span id="generation"></span>)</button>
+  <div id="screen"></div>
+  <button id="save">save (generation <span id="generation" class="dynamic-inside"></span>)</button>
 </body>
 
 </html>
