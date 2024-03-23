@@ -2,103 +2,31 @@
 <html>
 
 <head>
-  <title>miniflash</title>
-  <script type="text/javascript">
-    /// quine magic ///
+  <meta charset="utf-8">
+  <title>flashed cards</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    "use strict";
 
-    function promptDownload(filename, contents) {
-      let blob = new Blob([contents], { "type": "text/plain" });
-      let blobUrl = URL.createObjectURL(blob);
-
-      let a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      a.click();
-
-      URL.revokeObjectURL(blobUrl);
-      a.remove();
-    }
-
-    function quine() {
-      let clone = document.documentElement.cloneNode(true);
-
-      //remove dynamism from the page
-      clone.querySelectorAll(".noquine, .noquineinside *").forEach(elem => elem.remove());
-
-      //save script variables
-      let globalsToSave = ["cards", "generation"];
-      generation++; //bump the generation up
-      let globalsScript = "\n";
-      for (global of globalsToSave) {
-        let realizedGlobal = globalThis[global];
-        let cryoGlobal = realizedGlobal.cryo ? realizedGlobal.cryo() : JSON.stringify(realizedGlobal);
-        globalsScript += "globalThis." + global + " = " + cryoGlobal + ";\n";
-      }
-      clone.querySelector("#globals").innerHTML = globalsScript;
-      generation--; //keep *my* generation the same
-
-      //create page
-      let outer = "<!DOCTYPE html>\n" + clone.outerHTML;
-      console.log(outer);
-      promptDownload("index.html", outer);
-    }
-
-    function escapeQuote(s) {
-      return s.replace("\"", "\\\"");
-    }
-
-    /// DOM utilties ///
-
-    function setContents(id, elems) {
-      let container = document.getElementById(id);
-      while (container.firstChild) container.firstChild.remove();
-      if (!Array.isArray(elems)) elems = [elems];
-      for (let e of elems) container.appendChild(e);
-    }
-
-    /// cards ///
-
-    class Card {
-      //string
-      id;
-      
-      //string
-      front;
-      
-      //string
-      back;
+    class Flashcard {
+      id; front; back;
 
       constructor(props) {
-        this.id = props.id;
-        this.front = props.front;
-        this.back = props.back;
+        Object.assign(this, props);
       }
 
       cryo() {
-        return `new Card({id:${JSON.stringify(this.id)},front:${JSON.stringify(this.front)},back:${JSON.stringify(this.back)}})`;
-      }
-      
-      renderCard(side) {
-        let div = document.createElement("div");
-        div.classList = ["card", side ? "front" : "back"];
-        div.innerHtml = side ? this.front : this.back;
-        return div;
+        return `new Flashcard(${JSON.stringify(this)})`;
       }
     }
 
-    class Deck {
-      //string
-      id;
+    class CardDeck {
+      id; cards;
 
-      //card[]
-      cards;
-
-      //map<string, card>
       cardsById;
 
       constructor(props) {
-        this.id = props.id;
-        this.cards = props.cards;
+        Object.assign(this, props);
 
         this.cardsById = {};
         for (let card of this.cards) {
@@ -107,19 +35,16 @@
       }
 
       cryo() {
-        return `new Deck({id:"${escapeQuote(this.id)}",cards:[${this.cards.map(card => card.cryo()).join(",")}]})`;
+        return `new CardDeck({id:"${this.id}",cards:[${this.cards.map(card => card.cryo()).join(",")}]})`;
       }
     }
 
-    class CardDatabase {
-      //deck[]
-      decks;
-
-      //map<string, deck>
-      decksById;
+    class Database {
+      decks; decksById;
 
       constructor(props) {
-        this.decks = props.decks;
+        Object.assign(this, props);
+        console.log(this);
 
         this.decksById = {};
         for (let deck of this.decks) {
@@ -128,108 +53,189 @@
       }
 
       cryo() {
-        return `new CardDatabase({decks:[${this.decks.map(deck => deck.cryo()).join(",")}]})`;
-      }
-
-      renderPicker() {
-        let ul = document.createElement("ul");
-
-        for (let deck of this.decks) {
-          let li = document.createElement("li");
-          li.addEventListener("click", e => pickDeck(deck));
-          li.innerText = deck.id;
-          ul.appendChild(li);
-        }
-
-        return ul;
+        return `new Database({decks:[${this.decks.map(deck => deck.cryo()).join(",")}]})`;
       }
     }
 
-    class Study {
-      //deck
-      deck;
+  </script>
+  <script id="globals">
+    "use strict";
+    globalThis.generation = 0;
+    globalThis.database = new Database({ decks: [new CardDeck({ id: "deck", cards: [new Flashcard({ id: "foo", front: "FRONT", back: "BACK" })] })] });
+  </script>
+  <script>
+    "use strict";
 
-      //string[] (card ids)
-      toStudy;
-
-      //string[] (card ids)
-      correct;
-
-      //string[] (card ids)
-      incorrect;
-      
-      //card id
-      currentCardId;
-      
-      //various html elements
-      studyElement;
-
-      constructor(props) {
-        this.deck = props.deck;
-
-        this.toStudy = Object.keys(deck.cardsById);
-        for (let i = toStudy.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [toStudy[i], toStudy[j]] = [toStudy[j], toStudy[i]];
-        }
-        this.correct = [];
-        this.incorrect = [];
-        
-        this.currentCardId = this.toStudy.pop();
-      }
-      
-      renderStudy() {
-        this.studyElement = document.createElement("div");
-        this.studyElement.class = "study";
-        
-        let cardElement = this.deck.cardsById[this.currentCardId].renderCard();
-        this.studyElement.appendChild();
-      }
+    function $(sel) {
+      let result = document.querySelectorAll(sel);
+      if (sel[0] == '#' && result.length == 1) return result[0]; //act more like getElementById
+      else return result; //else return all the elements
     }
 
-    /// State ///
-
+    let toStudy = [];
+    
     let currentDeck = undefined;
     let currentCard = undefined;
+    let currentSide = "front";
 
-    document.addEventListener("DOMContentLoaded", e => {
-      let picker = globalThis.cards.renderPicker();
+    //show contents of a card in the html element
+    function display() {
+      let card = globalThis.database.decksById[currentDeck].cardsById[currentCard];
+      
+      $("#card").innerHTML = card[currentSide];
+      $("#card").style.backgroundColor = (currentSide == "front" ? "white" : "#DEDEDE"); //todo use classes
+    }
 
-      setContents("container", picker);
-      console.log(picker);
-      console.log(globalThis.cards);
-      console.log(globalThis.cards.cryo());
-      console.log(eval(globalThis.cards.cryo()))
+    //flop current card to the other side
+    function flip() {
+      currentSide = (currentSide == "front" ? "back" : "front");
+      display();
+    }
+
+    //repopulate and shuffle the pile of cards to study
+    function reshuffle() {
+      let deck = globalThis.database.decksById[currentDeck];
+      
+      toStudy = Object.keys(deck.cardsById);
+      for (let i = toStudy.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [toStudy[i], toStudy[j]] = [toStudy[j], toStudy[i]];
+      }
+      console.log("shuffled! ", toStudy);
+    }
+
+    //draw a card from the deck
+    function another() {
+      if (toStudy.length == 0) reshuffle();
+
+      currentCard = toStudy[toStudy.length - 1];
+      display();
+      toStudy.pop();
+    }
+
+    function quine() {
+      let copy = document.documentElement.cloneNode(true);
+      copy.querySelectorAll(".dynamic, .dynamic-inside *").forEach(elem => elem.remove());
+      copy.querySelectorAll(".dynamic-inside").forEach(elem => {
+        while (elem.firstChild) elem.firstChild.remove();
+      });
+
+      generation++;
+
+      let globalsToSave = ["generation", "database"];
+      let globalsScript = `\n"use strict";\n`;
+      for (let globalName of globalsToSave) {
+        let global = globalThis[globalName];
+        console.log(globalName, global);
+        let cryo = global.cryo ? global.cryo() : JSON.stringify(global);
+        
+        globalsScript += globalName + " = " + cryo + ";\n";
+      }
+
+      generation--; //restore
+      copy.querySelector("#globals").innerHTML = globalsScript;
+
+      let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
+
+      //download
+      if(true) {
+        console.log(stringified);
+        return;
+      }
+      
+      let blob = new Blob([stringified], { type: "text/html" });
+      let url = URL.createObjectURL(blob);
+      let a = document.createElement("a");
+      a.href = url;
+      a.download = "quine.html";
+      a.click();
+      URL.revokeObjectURL(url);
+      a.remove();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      $("#generation").innerHTML = globalThis.generation;
+      
+      //initialize the current deck and such
+      currentDeck = globalThis.database.decks[0].id;
+      
+      
+      $("#card").addEventListener("click", () => flip());
+      $("#another").addEventListener("click", (e) => {
+        another();
+        e.target.blur(); //so pressing space doesnt press the button again
+      });
+      $("#save").addEventListener("click", () => quine());
+
+      //disable double-click-to-select on the card
+      $("#card").addEventListener("mousedown", e => {
+        if (e.detail > 1) e.preventDefault();
+      });
+
+      //hotkeys
+      document.addEventListener("keypress", e => {
+        if (e.key == "a") another();
+        else if (e.key == " ") flip();
+      });
+
+      //initial shuffle
+      another();
     });
-  </script>
-  <script type="text/javascript" id="globals">
-    globalThis.generation = 0;
 
-    globalThis.cards = new CardDatabase({
-      decks: [
-        new Deck({
-          id: "foo",
-          cards: [
-            new Card({ id: "foo" }),
-            new Card({ id: "bar" }),
-          ]
-        }),
-        new Deck({
-          id: "foo2",
-          cards: [
-            new Card({ id: "foo2" }),
-            new Card({ id: "bar2" }),
-          ]
-        }),
-      ]
-    });
   </script>
+  <style>
+    html,
+    body {
+      margin: 0;
+    }
+
+    body {
+      padding-top: 3em;
+      gap: 3em;
+      background-color: lightgray;
+
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #card {
+      width: 35rem;
+      height: 20rem;
+      background-color: white;
+      color: black;
+      font-size: 3rem;
+      border: 3px solid black;
+      box-shadow: 3px 3px 0px gray;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    #another {
+      font-size: 3rem;
+    }
+
+    @media(max-width: 600px) {
+      #card {
+        width: 90vw;
+        font-size: 2rem;
+      }
+
+      #another u {
+        text-decoration: none;
+      }
+    }
+  </style>
 </head>
 
 <body>
   <h1>miniflash</h1>
-  <div id="container" class="noquineinside"></div>
-  <button onclick="quine()">clone</button>
+  <div id="card" class="dynamic-inside"></div>
+  <button id="another"><u>a</u>nother</button>
+  <button id="save">save (generation <span id="generation"></span>)</button>
 </body>
 
 </html>
