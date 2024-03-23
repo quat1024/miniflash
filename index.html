@@ -55,60 +55,89 @@
       if (!Array.isArray(elems)) elems = [elems];
       for (let e of elems) container.appendChild(e);
     }
-    
+
     /// cards ///
 
     class Card {
       //string
       id;
+      
+      //string
+      front;
+      
+      //string
+      back;
 
       constructor(props) {
         this.id = props.id;
+        this.front = props.front;
+        this.back = props.back;
       }
 
       cryo() {
-        return `new Card({id:${JSON.stringify(this.id)}})`;
+        return `new Card({id:${JSON.stringify(this.id)},front:${JSON.stringify(this.front)},back:${JSON.stringify(this.back)}})`;
+      }
+      
+      renderCard(side) {
+        let div = document.createElement("div");
+        div.classList = ["card", side ? "front" : "back"];
+        div.innerHtml = side ? this.front : this.back;
+        return div;
       }
     }
 
     class Deck {
+      //string
+      id;
+
       //card[]
       cards;
 
+      //map<string, card>
+      cardsById;
+
       constructor(props) {
+        this.id = props.id;
         this.cards = props.cards;
+
+        this.cardsById = {};
+        for (let card of this.cards) {
+          this.cardsById[card.id] = card;
+        }
       }
 
       cryo() {
-        return "new Deck({cards:[" + this.cards.map(card => card.cryo()).join(",") + "]})";
+        return `new Deck({id:"${escapeQuote(this.id)}",cards:[${this.cards.map(card => card.cryo()).join(",")}]})`;
       }
     }
 
     class CardDatabase {
-      //map<string, deck>
+      //deck[]
       decks;
+
+      //map<string, deck>
+      decksById;
 
       constructor(props) {
         this.decks = props.decks;
+
+        this.decksById = {};
+        for (let deck of this.decks) {
+          this.decksById[deck.id] = deck;
+        }
       }
 
       cryo() {
-        let decksJson = "{" + Object.keys(this.decks).map(deckName => {
-          let key = `"${escapeQuote(deckName)}"`;
-          let value = this.decks[deckName].cryo();
-          return key + ":" + value;
-        }).join(",") + "}";
-
-        return `new CardDatabase({decks:${decksJson}})`;
+        return `new CardDatabase({decks:[${this.decks.map(deck => deck.cryo()).join(",")}]})`;
       }
 
       renderPicker() {
         let ul = document.createElement("ul");
 
-        for (let deckName of Object.keys(this.decks)) {
+        for (let deck of this.decks) {
           let li = document.createElement("li");
-          li.addEventListener("click", e => alert(deckName));
-          li.innerText = deckName;
+          li.addEventListener("click", e => pickDeck(deck));
+          li.innerText = deck.id;
           ul.appendChild(li);
         }
 
@@ -116,34 +145,83 @@
       }
     }
 
+    class Study {
+      //deck
+      deck;
+
+      //string[] (card ids)
+      toStudy;
+
+      //string[] (card ids)
+      correct;
+
+      //string[] (card ids)
+      incorrect;
+      
+      //card id
+      currentCardId;
+      
+      //various html elements
+      studyElement;
+
+      constructor(props) {
+        this.deck = props.deck;
+
+        this.toStudy = Object.keys(deck.cardsById);
+        for (let i = toStudy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [toStudy[i], toStudy[j]] = [toStudy[j], toStudy[i]];
+        }
+        this.correct = [];
+        this.incorrect = [];
+        
+        this.currentCardId = this.toStudy.pop();
+      }
+      
+      renderStudy() {
+        this.studyElement = document.createElement("div");
+        this.studyElement.class = "study";
+        
+        let cardElement = this.deck.cardsById[this.currentCardId].renderCard();
+        this.studyElement.appendChild();
+      }
+    }
+
     /// State ///
+
     let currentDeck = undefined;
     let currentCard = undefined;
 
     document.addEventListener("DOMContentLoaded", e => {
       let picker = globalThis.cards.renderPicker();
-      
+
       setContents("container", picker);
+      console.log(picker);
+      console.log(globalThis.cards);
+      console.log(globalThis.cards.cryo());
+      console.log(eval(globalThis.cards.cryo()))
     });
   </script>
   <script type="text/javascript" id="globals">
     globalThis.generation = 0;
 
     globalThis.cards = new CardDatabase({
-      decks: {
-        "foo": new Deck({
+      decks: [
+        new Deck({
+          id: "foo",
           cards: [
             new Card({ id: "foo" }),
             new Card({ id: "bar" }),
           ]
         }),
-        "bar3": new Deck({
+        new Deck({
+          id: "foo2",
           cards: [
-            new Card({ id: "foo3" }),
-            new Card({ id: "bar3" }),
+            new Card({ id: "foo2" }),
+            new Card({ id: "bar2" }),
           ]
         }),
-      }
+      ]
     });
   </script>
 </head>
