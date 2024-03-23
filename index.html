@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>flashed cards</title>
+  <title>miniflash</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script>
     "use strict";
@@ -33,6 +33,12 @@
           this.cardsById[card.id] = card;
         }
       }
+      
+      addCard(card) {
+        this.cards.push(card);
+        this.cardsById[card.id] = card;
+        dirty();
+      }
 
       cryo() {
         return `new CardDeck({id:"${this.id}",cards:[${this.cards.map(card => card.cryo()).join(",")}]})`;
@@ -55,6 +61,19 @@
       addDeck(deck) {
         this.decks.push(deck);
         this.decksById[deck.id] = deck;
+        dirty();
+      }
+      
+      changeId(deck, newId) {
+        this.decksById[deck.id] = undefined;
+        deck.id = newId;
+        this.decksById[newId] = deck;
+        dirty();
+      }
+      
+      deleteDeck(deck) {
+        this.decks.splice(this.decks.indexOf(deck), 1);
+        this.decksById[deck.id] = undefined;
         dirty();
       }
 
@@ -132,7 +151,11 @@
     }
 
     class SelectDeckScreen {
-      constructor() { }
+      database;
+      
+      constructor(database) {
+        this.database = database ? database : globalThis.database;
+      }
 
       init() {
         let left;
@@ -144,10 +167,10 @@
 
           let { list } = left.collect();
 
-          for (let deck of globalThis.database.decks) {
+          for (let deck of this.database.decks) {
             let li = h`<li><a ref="a">${deck.id}</a></li>`;
             let { a } = li.collect();
-            a.addEventListener("click", e => openScreen(new StudyScreen(deck)));
+            a.addEventListener("click", e => openScreen(new ManageDeckScreen(deck)));
             list.appendChild(li);
           }
         } else {
@@ -157,7 +180,7 @@
         let hmm = h`<div class="select-deck">
           ${left}
           <div>
-            <p>This is miniflash. You have ${globalThis.database.decks.length} deck${globalThis.database.decks.length == 1 ? "" : "s"}.</p>
+            <p>This is miniflash. You have ${this.database.decks.length} deck${this.database.decks.length == 1 ? "" : "s"}.</p>
             <button ref="addNew">Add a new deck</button>
           </div>
         </div>`;
@@ -172,7 +195,7 @@
       constructor() { }
 
       init() {
-        let hmm = h`<div class="add-deck">
+        let hmm = h`<div class="vflex">
           <div>Name of deck:</div>
           <input ref="textbox" type="text" autofocus />
           <button ref="add">Add deck</button>
@@ -197,6 +220,85 @@
           openScreen(new SelectDeckScreen());
         });
 
+        return hmm;
+      }
+    }
+    
+    class ManageDeckScreen {
+      deck;
+      
+      constructor(deck) {
+        this.deck = deck;
+      }
+      
+      init() {
+        let hmm = h`<div class="hflex manage-deck">
+          <div class="vflex">
+            <p ref="cardCount"></p>
+            <button ref="addCard" autofocus>New card</button>
+            <ul ref="cardList"></ul>
+          </div>
+          <div class="vflex">
+            <button ref="studyButton">Study deck</button>
+            <input ref="renameField" type="text" />
+            <button ref="renameButton">Rename deck</button>
+            <button ref="deleteButton">Delete deck</button>
+          </div>`;
+        
+        let {cardCount, addCard, studyButton, renameField, renameButton, deleteButton} = hmm.collect();
+        
+        cardCount.innerText = `This deck has ${this.deck.cards.length} card${this.deck.cards.length == 1 ? "" : "s"}.`
+        
+        addCard.addEventListener("click", e => openScreen(new AddCardScreen(this.deck)));
+        
+        studyButton.addEventListener("click", e => openScreen(new StudyScreen(this.deck)));
+        
+        renameField.value = this.deck.id;
+        renameButton.addEventListener("click", e => {
+          let newId = renameField.value;
+          globalThis.database.changeId(this.deck, newId);
+          openScreen(new SelectDeckScreen());
+        })
+        
+        deleteButton.addEventListener("click", e => {
+          globalThis.database.deleteDeck(this.deck);
+          openScreen(new SelectDeckScreen());
+        })
+        
+        return hmm;
+      }
+    }
+    
+    class AddCardScreen {
+      deck;
+      
+      constructor(deck) {
+        this.deck = deck;
+      }
+      
+      init() {
+        let hmm = h`<div class="vflex">
+          <label for="frontField">Front side</label>
+          <input type="text" id="frontField" ref="frontField" autofocus />
+          <label for="backField">Back side</label>
+          <input type="text" id="backField" ref="backField" />
+          <button ref="addButton">Add card</button>
+        </div>`
+        
+        let {frontField, backField, addButton} = hmm.collect();
+        
+        let doIt = () => {
+          let front = frontField.value;
+          let back = backField.value;
+          let id = Math.random();
+          
+          this.deck.addCard(new Flashcard({front, back, id}));
+          openScreen(new ManageDeckScreen(this.deck));
+        }
+        
+        addButton.addEventListener("click", e => doIt());
+        backField.addEventListener("keyup", e => { if(e.key == "Enter") doIt(); });
+        
         return hmm;
       }
     }
@@ -331,11 +433,10 @@
 
       let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
       
-      clean();
-
       //download
       if (true) { // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         console.log(stringified);
+        clean();
         return;
       }
 
@@ -347,10 +448,12 @@
       a.click();
       URL.revokeObjectURL(url);
       a.remove();
+      
+      clean();
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      $("#generation").innerHTML = globalThis.generation;
+      $("#generation").innerText = globalThis.generation;
       $("#save").addEventListener("click", e => quine());
       $("#title").addEventListener("click", e => openScreen(new SelectDeckScreen()));
       openScreen(new SelectDeckScreen());
@@ -417,8 +520,20 @@
     .decklist a {
       color: red;
     }
+    
+    .manage-deck {
+      display: flex;
+      flex-direction: row;
+      gap: var(--pad-lg);
+    }
+    
+    .hflex {
+      display: flex;
+      flex-direction: row;
+      gap: var(--pad-med);
+    }
 
-    .add-deck {
+    .vflex {
       display: flex;
       flex-direction: column;
       align-items: start;
