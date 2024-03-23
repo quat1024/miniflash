@@ -1,0 +1,19 @@
+{
+  "name": "miniflash",
+  "version": "1.0.0",
+  "description": "Self-contained flash cards program",
+  "main": "src/index.mjs",
+  "scripts": {
+    "bundle": "esbuild ./src/index.jsx --bundle --minify --sourcemap --outfile=./out/bundle.mjs ",
+    "watch": "esbuild ./src/index.jsx --bundle --watch --sourcemap --outfile=./out/bundle.mjs"
+  },
+  "author": "quat",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "esbuild": "0.20.2"
+  },
+  "dependencies": {
+    "htm": "^3.1.1",
+    "preact": "^10.20.1"
+  }
+}

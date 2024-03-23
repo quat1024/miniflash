@@ -1,0 +1,10 @@
+{
+  "include": ["./src/**/*.jsx", "./src/**/*.tsx"],
+  "compilerOptions": {
+    "target": "es6",
+    "moduleResolution": "NodeNext",
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment"
+  }
+}
