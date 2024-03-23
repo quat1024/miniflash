@@ -39,6 +39,13 @@
         this.cardsById[card.id] = card;
         dirty();
       }
+      
+      deleteCard(card) {
+        debugger;
+        this.cards.shift(this.cards.indexOf(card), 1);
+        delete this.cardsById[card.id];
+        dirty();
+      }
 
       cryo() {
         return `new CardDeck({id:"${this.id}",cards:[${this.cards.map(card => card.cryo()).join(",")}]})`;
@@ -65,7 +72,7 @@
       }
       
       changeId(deck, newId) {
-        this.decksById[deck.id] = undefined;
+        delete decksById[deck.id];
         deck.id = newId;
         this.decksById[newId] = deck;
         dirty();
@@ -177,7 +184,7 @@
           left = h`<div><p>No decks.</p></div>`
         }
 
-        let hmm = h`<div class="select-deck">
+        let hmm = h`<div class="twocol">
           ${left}
           <div>
             <p>This is miniflash. You have ${this.database.decks.length} deck${this.database.decks.length == 1 ? "" : "s"}.</p>
@@ -232,7 +239,7 @@
       }
       
       init() {
-        let hmm = h`<div class="hflex manage-deck">
+        let hmm = h`<div class="twocol">
           <div class="vflex">
             <p ref="cardCount"></p>
             <button ref="addCard" autofocus>New card</button>
@@ -245,15 +252,28 @@
             <button ref="deleteButton">Delete deck</button>
           </div>`;
         
-        let {cardCount, addCard, studyButton, renameField, renameButton, deleteButton} = hmm.collect();
+        let {cardCount, addCard, cardList, studyButton, renameField, renameButton, deleteButton} = hmm.collect();
         
         cardCount.innerText = `This deck has ${this.deck.cards.length} card${this.deck.cards.length == 1 ? "" : "s"}.`
-        
         addCard.addEventListener("click", e => openScreen(new AddCardScreen(this.deck)));
+        addCard.focus();
+        
+        for(let card of this.deck.cards) {
+          let cardHtml = h`<li><button ref="del">x</button> ${card.front} - ${card.back}</li>`
+          
+          let { del } = cardHtml.collect();
+          del.addEventListener("click", e => {
+            this.deck.deleteCard(card);
+            openScreen(new ManageDeckScreen(this.deck));
+          })
+          
+          cardList.appendChild(cardHtml);
+        }
         
         studyButton.addEventListener("click", e => openScreen(new StudyScreen(this.deck)));
         
         renameField.value = this.deck.id;
+        renameField.addEventListener("keyup", e => { if(e.key == "Enter") renameButton.click(); });
         renameButton.addEventListener("click", e => {
           let newId = renameField.value;
           globalThis.database.changeId(this.deck, newId);
@@ -297,6 +317,7 @@
         }
         
         addButton.addEventListener("click", e => doIt());
+        frontField.focus();
         backField.addEventListener("keyup", e => { if(e.key == "Enter") doIt(); });
         
         return hmm;
@@ -409,7 +430,9 @@
       $("#save").style.outline = "none";
     }
     
-    function quine() {
+    function quine(e) {
+      clean();
+      
       let copy = document.documentElement.cloneNode(true);
       copy.querySelectorAll(".dynamic, .dynamic-inside *").forEach(elem => elem.remove());
       copy.querySelectorAll(".dynamic-inside").forEach(elem => {
@@ -425,7 +448,7 @@
         console.log(globalName, global);
         let cryo = global.cryo ? global.cryo() : JSON.stringify(global);
 
-        globalsScript += globalName + " = " + cryo + ";\n";
+        globalsScript += `globalThis.${globalName} = ${cryo};\n`;
       }
 
       generation--; //restore
@@ -434,9 +457,8 @@
       let stringified = `<!DOCTYPE html>\n` + copy.outerHTML;
       
       //download
-      if (true) { // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+      if (e && e.shiftKey) { // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
         console.log(stringified);
-        clean();
         return;
       }
 
@@ -448,13 +470,11 @@
       a.click();
       URL.revokeObjectURL(url);
       a.remove();
-      
-      clean();
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      $("#generation").innerText = globalThis.generation;
-      $("#save").addEventListener("click", e => quine());
+      $("#generationDisplay").innerText = globalThis.generation;
+      $("#save").addEventListener("click", e => quine(e));
       $("#title").addEventListener("click", e => openScreen(new SelectDeckScreen()));
       openScreen(new SelectDeckScreen());
     });
@@ -501,13 +521,13 @@
       justify-content: space-between;
     }
 
-    .select-deck {
+    .twocol {
       display: flex;
       flex-direction: row;
       gap: var(--pad-lg);
     }
 
-    .select-deck>* {
+    .twocol>* {
       padding: var(--pad-med);
       border: 1px solid black;
       border-radius: var(--pad-small);
@@ -560,9 +580,9 @@
 <body>
   <nav>
     <h1><a id="title">miniflash</a></h1>
-    <button id="save">save (generation <span id="generation" class="dynamic-inside"></span>)</button>
+    <button id="save">save (generation <span id="generationDisplay" class="dynamic-inside"></span>)</button>
   </nav>
-  <main id="screen">
+  <main id="screen" class="dynamic-inside">
 
   </main>
 </body>
