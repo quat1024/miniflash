@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>miniflash</title>
+  <script type="text/javascript">
+    /// quine magic ///
+
+    function promptDownload(filename, contents) {
+      let blob = new Blob([contents], { "type": "text/plain" });
+      let blobUrl = URL.createObjectURL(blob);
+
+      let a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      a.click();
+
+      URL.revokeObjectURL(blobUrl);
+      a.remove();
+    }
+
+    function quine() {
+      let clone = document.documentElement.cloneNode(true);
+
+      //remove dynamism from the page
+      clone.querySelectorAll(".noquine, .noquineinside *").forEach(elem => elem.remove());
+
+      //save script variables
+      let globalsToSave = ["cards", "generation"];
+      generation++; //bump the generation up
+      let globalsScript = "\n";
+      for (global of globalsToSave) {
+        let realizedGlobal = globalThis[global];
+        let cryoGlobal = realizedGlobal.cryo ? realizedGlobal.cryo() : JSON.stringify(realizedGlobal);
+        globalsScript += "globalThis." + global + " = " + cryoGlobal + ";\n";
+      }
+      clone.querySelector("#globals").innerHTML = globalsScript;
+      generation--; //keep *my* generation the same
+
+      //create page
+      let outer = "<!DOCTYPE html>\n" + clone.outerHTML;
+      console.log(outer);
+      promptDownload("index.html", outer);
+    }
+
+    function escapeQuote(s) {
+      return s.replace("\"", "\\\"");
+    }
+
+    /// DOM utilties ///
+
+    function setContents(id, elems) {
+      let container = document.getElementById(id);
+      while (container.firstChild) container.firstChild.remove();
+      if (!Array.isArray(elems)) elems = [elems];
+      for (let e of elems) container.appendChild(e);
+    }
+    
+    /// cards ///
+
+    class Card {
+      //string
+      id;
+
+      constructor(props) {
+        this.id = props.id;
+      }
+
+      cryo() {
+        return `new Card({id:${JSON.stringify(this.id)}})`;
+      }
+    }
+
+    class Deck {
+      //card[]
+      cards;
+
+      constructor(props) {
+        this.cards = props.cards;
+      }
+
+      cryo() {
+        return "new Deck({cards:[" + this.cards.map(card => card.cryo()).join(",") + "]})";
+      }
+    }
+
+    class CardDatabase {
+      //map<string, deck>
+      decks;
+
+      constructor(props) {
+        this.decks = props.decks;
+      }
+
+      cryo() {
+        let decksJson = "{" + Object.keys(this.decks).map(deckName => {
+          let key = `"${escapeQuote(deckName)}"`;
+          let value = this.decks[deckName].cryo();
+          return key + ":" + value;
+        }).join(",") + "}";
+
+        return `new CardDatabase({decks:${decksJson}})`;
+      }
+
+      renderPicker() {
+        let ul = document.createElement("ul");
+
+        for (let deckName of Object.keys(this.decks)) {
+          let li = document.createElement("li");
+          li.addEventListener("click", e => alert(deckName));
+          li.innerText = deckName;
+          ul.appendChild(li);
+        }
+
+        return ul;
+      }
+    }
+
+    /// State ///
+    let currentDeck = undefined;
+    let currentCard = undefined;
+
+    document.addEventListener("DOMContentLoaded", e => {
+      let picker = globalThis.cards.renderPicker();
+      
+      setContents("container", picker);
+    });
+  </script>
+  <script type="text/javascript" id="globals">
+    globalThis.generation = 0;
+
+    globalThis.cards = new CardDatabase({
+      decks: {
+        "foo": new Deck({
+          cards: [
+            new Card({ id: "foo" }),
+            new Card({ id: "bar" }),
+          ]
+        }),
+        "bar3": new Deck({
+          cards: [
+            new Card({ id: "foo3" }),
+            new Card({ id: "bar3" }),
+          ]
+        }),
+      }
+    });
+  </script>
+</head>
+
+<body>
+  <h1>miniflash</h1>
+  <div id="container" class="noquineinside"></div>
+  <button onclick="quine()">clone</button>
+</body>
+
+</html>
