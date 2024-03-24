@@ -88,11 +88,6 @@
     }
 
   </script>
-  <script id="globals">
-    "use strict";
-    globalThis.generation = 0;
-    globalThis.database = new Database({ decks: [new CardDeck({ id: "deck", cards: [new Flashcard({ id: "foo", front: "FRONT", back: "BACK" })] })] });
-  </script>
   <script>
     "use strict";
 
@@ -173,9 +168,10 @@
           let { list } = left.collect();
 
           for (let deck of this.database.decks) {
-            let li = h`<li ref="clic">${deck.id}</li>`;
-            let { clic } = li.collect();
-            clic.addEventListener("click", e => openScreen(new ManageDeckScreen(deck)));
+            let li = h`<li><button ref="editButton">✏</button><div ref="study">${deck.id}</div></li>`;
+            let { study, editButton } = li.collect();
+            study.addEventListener("click", e => openScreen(new StudyScreen(deck)));
+            editButton.addEventListener("click", e => openScreen(new ManageDeckScreen(deck)));
             list.appendChild(li);
           }
         } else {
@@ -240,14 +236,15 @@
         let hmm = h`<div class="twocol">
           <div class="vflex">
             <p ref="cardCount"></p>
-            <button ref="addCard" autofocus>New card</button>
+            <button ref="addCard" autofocus>➕ New card</button>
             <ul ref="cardList"></ul>
           </div>
           <div class="vflex">
-            <button ref="studyButton">Study deck</button>
+            <button ref="studyButton">👀 Study deck</button>
+            <div class="hflex">
             <input ref="renameField" type="text" />
-            <button ref="renameButton">Rename deck</button>
-            <button ref="deleteButton">Delete deck</button>
+            <button ref="renameButton">Rename deck</button></div>
+            <button ref="deleteButton">❌ Delete deck</button>
           </div>`;
 
         let { cardCount, addCard, cardList, studyButton, renameField, renameButton, deleteButton } = hmm.collect();
@@ -257,7 +254,7 @@
         addCard.focus();
 
         for (let card of this.deck.cards) {
-          let cardHtml = h`<li><button ref="del">x</button> ${card.front} - ${card.back}</li>`;
+          let cardHtml = h`<li><button ref="del">❌</button> ${card.front} - ${card.back}</li>`;
           let capture = card; //woh
 
           let { del } = cardHtml.collect();
@@ -454,7 +451,6 @@
       for (let globalName of globalsToSave) {
         let global = globalThis[globalName];
         let cryo = global.cryo ? global.cryo() : JSON.stringify(global);
-
         globalsScript += `globalThis.${globalName} = ${cryo};\n`;
       }
 
@@ -491,6 +487,8 @@
     :root {
       --white: #fff;
       --grey: #dedede;
+      --darkgrey: #777;
+      --black: #000;
 
       --pad-small: 0.5rem;
       --pad-med: 1rem;
@@ -527,6 +525,10 @@
       flex-direction: row;
       justify-content: space-between;
     }
+    
+    main, main input, main button {
+      font-size: 1.5rem;
+    }
 
     .twocol {
       display: flex;
@@ -536,8 +538,9 @@
 
     .twocol>* {
       padding: var(--pad-med);
-      border: 1px solid black;
+      border: 1px solid var(--darkgrey);
       border-radius: var(--pad-small);
+      box-shadow: 3px 3px 0px var(--grey);
     }
 
     ul {
@@ -563,6 +566,13 @@
     .decklist a {
       color: red;
     }
+    
+    .decklist li {
+      display: flex;
+      flex-direction: row;
+      gap: var(--pad-med);
+      align-items: center;
+    }
 
     .hflex {
       display: flex;
@@ -586,9 +596,11 @@
       height: 20rem;
       background-color: white;
       color: black;
+      font-family: serif;
       font-size: 3rem;
-      border: 3px solid black;
-      box-shadow: 3px 3px 0px gray;
+      border: 1px solid var(--darkgrey);
+      border-radius: var(--pad-small);
+      box-shadow: 3px 3px 0px var(--grey);
 
       display: flex;
       align-items: center;
@@ -597,10 +609,14 @@
     }
 
     #another {
-      font-size: 300%;
+      font-size: 200%;
     }
 
     @media screen and (max-width: 40rem) {
+      main {
+        font-size: 1rem;
+      }
+      
       .twocol {
         flex-direction: column;
       }
@@ -622,6 +638,11 @@
   <main id="screen" class="dynamic-inside">
 
   </main>
+  <script id="globals">
+    "use strict";
+    globalThis.generation = 0;
+    globalThis.database = new Database({decks:[new CardDeck({id:"what is this?",cards:[new Flashcard({"id":0.5390807896726179,"front":"flash cards","back":"rote memorization tool"}),new Flashcard({"id":0.4416127574511549,"front":"quine","back":"program that outputs own source code"})]}),new CardDeck({id:"spanish terms",cards:[new Flashcard({"id":0.5968932318921885,"front":"la carrera","back":"field, major"}),new Flashcard({"id":0.7388423993600177,"front":"el horario","back":"timetable"}),new Flashcard({"id":0.7410744377138192,"front":"tener cuidado","back":"to be cautious"}),new Flashcard({"id":0.12015975829221825,"front":"beísbol","back":"baseball"}),new Flashcard({"id":0.6726806573231451,"front":"el abuelo","back":"grandfather"}),new Flashcard({"id":0.5419657194481002,"front":"la abuela","back":"grandmother"}),new Flashcard({"id":0.5912885417809614,"front":"el cuñado","back":"brother in law"}),new Flashcard({"id":0.020826886731048377,"front":"la cuñada","back":"sister in law"}),new Flashcard({"id":0.718127088449526,"front":"ganar","back":"to earn"}),new Flashcard({"id":0.29513016948714765,"front":"jugar","back":"to play"}),new Flashcard({"id":0.9790560515854588,"front":"la izquierda","back":"left side"}),new Flashcard({"id":0.4985816830131403,"front":"la derecha","back":"right side"}),new Flashcard({"id":0.1052866376280922,"front":"el derecho","back":"rights"}),new Flashcard({"id":0.28455999724436054,"front":"la informática","back":"computer science"})]})]});
+</script>
 </body>
 
 </html>
