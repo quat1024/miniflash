@@ -427,12 +427,16 @@
       }
     }
 
+    let isDirty = false;
+    
     function dirty() {
       $("#save").style.outline = "2px solid red";
+      isDirty = true;
     }
 
     function clean() {
       $("#save").style.outline = "none";
+      isDirty = false;
     }
 
     function quine(e) {
@@ -480,6 +484,13 @@
       $("#save").addEventListener("click", e => quine(e));
       $("#title").addEventListener("click", e => openScreen(new SelectDeckScreen()));
       openScreen(new SelectDeckScreen());
+      
+      window.addEventListener("beforeunload", e => {
+        if(isDirty) {
+          e.preventDefault();
+          e.returnValue = "Changes have not been saved.";
+        }
+      });
     });
 
   </script>
